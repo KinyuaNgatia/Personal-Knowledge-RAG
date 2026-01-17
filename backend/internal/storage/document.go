@@ -1,0 +1,10 @@
+package storage
+
+import "time"
+
+type Document struct {
+	ID         string    `json:"id"`
+	Filename   string    `json:"filename"`
+	Path       string    `json:"path"`
+	UploadedAt time.Time `json:"uploaded_at"`
+}

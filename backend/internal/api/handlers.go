@@ -2,19 +2,83 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-func IngestPDFHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	json.NewEncoder(w).Encode(ErrorResponse{
-		Error: "not implemented",
-	})
-}
+const maxUploadSize = 10 << 20 // 10 MB
 
-func ChatHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	json.NewEncoder(w).Encode(ErrorResponse{
-		Error: "not implemented",
-	})
+func IngestPDFHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "file too large or invalid form data",
+		})
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "file is required",
+		})
+		return
+	}
+	defer file.Close()
+
+	if header.Header.Get("Content-Type") != "application/pdf" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "invalid file type, only PDFs are allowed",
+		})
+		return
+	}
+
+	documentID := uuid.New().String()
+	filename := documentID + ".pdf"
+
+	dstPath := filepath.Join("data", "raw", filename)
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "failed to store file",
+		})
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "failed to write file",
+		})
+		return
+	}
+
+	resp := IngestPDFResponse{
+		DocumentID:    documentID,
+		Filename:      header.Filename,
+		Status:        "stored",
+		ChunksCreated: 0,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+
+	_ = time.Now() // placeholder to signal metadata handling in next step
 }
