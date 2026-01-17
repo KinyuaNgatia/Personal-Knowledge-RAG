@@ -3,16 +3,19 @@ package main
 import (
 	"log"
 	"net/http"
+
+	"github.com/KinyuaNgatia/Personal-Knowledge-RAG/tree/main/backend/internal/api"
 )
 
 func main() {
 	mux := http.NewServeMux()
 
-	// Health check
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
+
+	api.RegisterRoutes(mux)
 
 	log.Println("Server starting on :8080")
 	if err := http.ListenAndServe(":8080", mux); err != nil {
