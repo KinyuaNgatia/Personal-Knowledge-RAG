@@ -1,0 +1,21 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+
+# Environment
+.env
+
+# Data
+data/raw/*
+data/processed/*
+data/index/*
+
+!.gitkeep

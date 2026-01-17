@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/KinyuaNgatia/Personal-Knowledge-RAG/tree/main/backend/internal/api"
+	"github.com/KinyuaNgatia/Personal-Knowledge-RAG/backend/internal/api"
 )
 
 func main() {
