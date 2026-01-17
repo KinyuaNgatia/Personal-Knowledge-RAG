@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/KinyuaNgatia/Personal-Knowledge-RAG/backend/internal/ingestion"
+	"github.com/KinyuaNgatia/Personal-Knowledge-RAG/backend/internal/storage"
 	"github.com/google/uuid"
 )
 
@@ -50,8 +52,24 @@ func IngestPDFHandler(w http.ResponseWriter, r *http.Request) {
 	documentID := uuid.New().String()
 	filename := documentID + ".pdf"
 
-	dstPath := filepath.Join("data", "raw", filename)
+	// Ensure raw and processed directories exist
+	if err := os.MkdirAll(filepath.Join("data", "raw"), 0755); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "failed to create raw storage directory",
+		})
+		return
+	}
+	if err := os.MkdirAll(filepath.Join("data", "processed"), 0755); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "failed to create processed storage directory",
+		})
+		return
+	}
 
+	// Save the raw PDF
+	dstPath := filepath.Join("data", "raw", filename)
 	dst, err := os.Create(dstPath)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -70,6 +88,25 @@ func IngestPDFHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract PDF text page by page ---
+	pages, err := ingestion.ExtractTextByPage(dstPath)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "failed to extract text from PDF",
+		})
+		return
+	}
+
+	if err := storage.SaveProcessedDocument(documentID, header.Filename, pages); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{
+			Error: "failed to store extracted text",
+		})
+		return
+	}
+
+	// --- Respond ---
 	resp := IngestPDFResponse{
 		DocumentID:    documentID,
 		Filename:      header.Filename,
@@ -80,5 +117,5 @@ func IngestPDFHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 
-	_ = time.Now() // placeholder to signal metadata handling in next step
+	_ = time.Now() // placeholder
 }
